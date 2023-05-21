@@ -10,12 +10,11 @@
 #ifndef MFRC522_h
 #define MFRC522_h
 
-#define SS 0
-
 #include "require_cpp11.h"
 // Enable integer limits
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
+#include <cstdio>
 #include "pico/stdlib.h"
 
 #ifndef MFRC522_SPICLOCK
@@ -278,6 +277,7 @@ public:
 	MFRC522();
 	MFRC522(uint8_t resetPowerDownPin);
 	MFRC522(uint8_t chipSelectPin, uint8_t resetPowerDownPin);
+	void SPI_INIT();
 
 	/////////////////////////////////////////////////////////////////////////////////////
 	// Basic interface functions for communicating with the MFRC522

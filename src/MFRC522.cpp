@@ -5,11 +5,13 @@
  */
 
 #include "MFRC522.h"
-#include <cstdio>
 #include <cstring>
-#include "hardware/spi.h"
 #include "hardware/gpio.h"
 #include "hardware/timer.h"
+#include "hardware/spi.h"
+
+#define millis time_us_32
+#define yield(...)
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Functions for setting up the Arduino
@@ -34,112 +36,26 @@ MFRC522::MFRC522(uint8_t resetPowerDownPin ///< Arduino pin connected to MFRC522
  * Constructor.
  * Prepares the output pins.
  */
-LOW1 MFRC522::MFRC522(uint8_t chipSelectPin,	///< Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
-					  uint8_t resetPowerDownPin ///< Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low). If there is no connection from the CPU to NRSTPD, set this to UINT8_MAX. In this case, only soft reset will be used in PCD_Init().
+MFRC522::MFRC522(uint8_t chipSelectPin,	   ///< Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
+				 uint8_t resetPowerDownPin ///< Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low). If there is no connection from the CPU to NRSTPD, set this to UINT8_MAX. In this case, only soft reset will be used in PCD_Init().
 )
 {
 	_chipSelectPin = chipSelectPin;
 	_resetPowerDownPin = resetPowerDownPin;
+	gpio_init(_chipSelectPin);
+	gpio_set_dir(_chipSelectPin, GPIO_OUT);
+	if (resetPowerDownPin != UINT8_MAX)
+	{
+		gpio_init(_resetPowerDownPin);
+		gpio_set_dir(_resetPowerDownPin, GPIO_OUT);
+	}
+	SPI_INIT();
+
 } // End constructor
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Basic interface functions for communicating with the MFRC522
 /////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Writes a  uint8_t to the specified register in the MFRC522 chip.
- * The interface is described in the datasheet section 8.1.2.
- */
-void MFRC522::PCD_WriteRegister(PCD_Register reg, ///< The register to write to. One of the PCD_Register enums.
-								uint8_t value	  ///< The value to write.
-)
-{
-	SPI.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0)); // Set the settings to work with SPI bus
-	gpio_put(_chipSelectPin, 0);											  // Select slave
-	SPI.transfer(reg);														  // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-	SPI.transfer(value);
-	gpio_put(_chipSelectPin, 1); // Release slave again
-	SPI.endTransaction();		 // Stop using the SPI bus
-} // End PCD_WriteRegister()
-
-/**
- * Writes a number of  uint8_ts to the specified register in the MFRC522 chip.
- * The interface is described in the datasheet section 8.1.2.
- */
-void MFRC522::PCD_WriteRegister(PCD_Register reg, ///< The register to write to. One of the PCD_Register enums.
-								uint8_t count,	  ///< The number of  uint8_ts to write to the register
-								uint8_t *values	  ///< The values to write.  uint8_t array.
-)
-{
-	SPI.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0)); // Set the settings to work with SPI bus
-	gpio_put(_chipSelectPin, 0);											  // Select slave
-	SPI.transfer(reg);														  // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-	for (uint8_t index = 0; index < count; index++)
-	{
-		SPI.transfer(values[index]);
-	}
-	gpio_put(_chipSelectPin, 1); // Release slave again
-	SPI.endTransaction();		 // Stop using the SPI bus
-} // End PCD_WriteRegister()
-
-/**
- * Reads a  uint8_t from the specified register in the MFRC522 chip.
- * The interface is described in the datasheet section 8.1.2.
- */
-uint8_t MFRC522::PCD_ReadRegister(PCD_Register reg ///< The register to read from. One of the PCD_Register enums.
-)
-{
-	uint8_t value;
-	SPI.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0)); // Set the settings to work with SPI bus
-	gpio_put(_chipSelectPin, 0);											  // Select slave
-	SPI.transfer(0x80 | reg);												  // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-	value = SPI.transfer(0);												  // Read the value back. Send 0 to stop reading.
-	gpio_put(_chipSelectPin, 1);											  // Release slave again
-	SPI.endTransaction();													  // Stop using the SPI bus
-	return value;
-} // End PCD_ReadRegister()
-
-/**
- * Reads a number of  uint8_ts from the specified register in the MFRC522 chip.
- * The interface is described in the datasheet section 8.1.2.
- */
-void MFRC522::PCD_ReadRegister(PCD_Register reg, ///< The register to read from. One of the PCD_Register enums.
-							   uint8_t count,	 ///< The number of  uint8_ts to read
-							   uint8_t *values,	 ///<  uint8_t array to store the values in.
-							   uint8_t rxAlign	 ///< Only bit positions rxAlign..7 in values[0] are updated.
-)
-{
-	if (count == 0)
-	{
-		return;
-	}
-	// printf("Reading ")); 	Serial.print(count); Serial.println(F("  uint8_ts from register.");
-	uint8_t address = 0x80 | reg;											  // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-	uint8_t index = 0;														  // Index in values array.
-	SPI.beginTransaction(SPISettings(MFRC522_SPICLOCK, MSBFIRST, SPI_MODE0)); // Set the settings to work with SPI bus
-	gpio_put(_chipSelectPin, 0);											  // Select slave
-	count--;																  // One read is performed outside of the loop
-	SPI.transfer(address);													  // Tell MFRC522 which address we want to read
-	if (rxAlign)
-	{ // Only update bit positions rxAlign..7 in values[0]
-	  // Create bit mask for bit positions rxAlign..7
-		uint8_t mask = (0xFF << rxAlign) & 0xFF;
-		// Read value and tell that we want to read the same address again.
-		uint8_t value = SPI.transfer(address);
-		// Apply mask to both current value of values[0] and the new data in value.
-		values[0] = (values[0] & ~mask) | (value & mask);
-		index++;
-	}
-	while (index < count)
-	{
-		values[index] = SPI.transfer(address); // Read value and tell that we want to read the same address again.
-		index++;
-	}
-	values[index] = SPI.transfer(0); // Read the final  uint8_t. Send 0 to stop reading.
-	gpio_put(_chipSelectPin, 1);	 // Release slave again
-	SPI.endTransaction();			 // Stop using the SPI bus
-} // End PCD_ReadRegister()
-
 /**
  * Sets the bits given in mask in register reg.
  */
@@ -184,7 +100,7 @@ MFRC522::StatusCode MFRC522::PCD_CalculateCRC(uint8_t *data,  ///< In: Pointer t
 	// indicate that the CRC calculation is complete in a loop. If the
 	// calculation is not indicated as complete in ~90ms, then time out
 	// the operation.
-	const uint32_t deadline = millis() + 89;
+	const uint32_t deadline = millis() + 89 * 1000;
 
 	do
 	{
@@ -428,7 +344,7 @@ bool MFRC522::PCD_PerformSelfTest()
 	// Verify that the results match up to our expectations
 	for (uint8_t i = 0; i < 64; i++)
 	{
-		if (result[i] != pgm_read_byte(&(reference[i])))
+		if (result[i] != reference[i])
 		{
 			return false;
 		}
@@ -464,7 +380,7 @@ void MFRC522::PCD_SoftPowerUp()
 	val &= ~(1 << 4);							// set PowerDown bit ( bit 4 ) to 0
 	PCD_WriteRegister(CommandReg, val);			// write new value to the command register
 	// wait until PowerDown bit is cleared (this indicates end of wake up procedure)
-	const uint32_t timeout = (uint32_t)millis() + 500; // create timer for timeout (just in case)
+	const uint32_t timeout = (uint32_t)millis() + 500 * 1000; // create timer for timeout (just in case)
 
 	while (millis() <= timeout)
 	{										// set timeout to 500 ms
@@ -540,7 +456,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(uint8_t command,	 ///< The 
 	// When they are set in the ComIrqReg register, then the command is
 	// considered complete. If the command is not indicated as complete in
 	// ~36ms, then consider the command as timed out.
-	const uint32_t deadline = millis() + 36;
+	const uint32_t deadline = millis() + 36 * 1000;
 	bool completed = false;
 
 	do

@@ -8,6 +8,7 @@
 #include "MFRC522Extended.h"
 #include <cstring>
 #include "hardware/timer.h"
+#include "pico/stdlib.h"
 
 /////////////////////////////////////////////////////////////////////////////////////
 // Functions for communicating with PICCs
@@ -881,7 +882,7 @@ MFRC522::StatusCode MFRC522Extended::TCL_Transceive(TagInfo *tag, uint8_t *sendD
 	// Swap block number on success
 	tag->blockNumber = !tag->blockNumber;
 
-	if (backData && (backLen > 0))
+	if (backData != NULL && (*backLen > 0))
 	{
 		if (*backLen < in.inf.size)
 			return STATUS_NO_ROOM;
@@ -906,7 +907,7 @@ MFRC522::StatusCode MFRC522Extended::TCL_Transceive(TagInfo *tag, uint8_t *sendD
 		if (result != STATUS_OK)
 			return result;
 
-		if (backData && (backLen > 0))
+		if (backData != NULL && (*backLen > 0))
 		{
 			if ((*backLen + ackDataSize) > totalBackLen)
 				return STATUS_NO_ROOM;
