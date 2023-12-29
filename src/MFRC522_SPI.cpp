@@ -40,8 +40,8 @@ void MFRC522::PCD_WriteRegister(PCD_Register reg, ///< The register to write to.
 {
     gpio_put(_chipSelectPin, 0); // Select slave
     const uint8_t regnum = reg;
-    spi_write_blocking(spi0, &regnum, 1); // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-    spi_write_blocking(spi0, &value, 1);
+    spi_write_blocking(spi1, &regnum, 1); // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+    spi_write_blocking(spi1, &value, 1);
     gpio_put(_chipSelectPin, 1); // Release slave again
 } // End PCD_WriteRegister()
 
@@ -56,10 +56,10 @@ void MFRC522::PCD_WriteRegister(PCD_Register reg, ///< The register to write to.
 {
     gpio_put(_chipSelectPin, 0); // Select slave
     const uint8_t regnum = reg;
-    spi_write_blocking(spi0, &regnum, 1); // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+    spi_write_blocking(spi1, &regnum, 1); // MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
     for (uint8_t index = 0; index < count; index++)
     {
-        spi_write_blocking(spi0, &values[index], 1);
+        spi_write_blocking(spi1, &values[index], 1);
     }
     gpio_put(_chipSelectPin, 1); // Release slave again
 } // End PCD_WriteRegister()
@@ -74,8 +74,8 @@ uint8_t MFRC522::PCD_ReadRegister(PCD_Register reg ///< The register to read fro
     uint8_t value;
     gpio_put(_chipSelectPin, 0);
     const uint8_t regnum = reg | 0x80;                 // Select slave
-    spi_write_read_blocking(spi0, &regnum, &value, 1); // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-    spi_read_blocking(spi0, 0xFF, &value, 1);          // Read the value back. Send 0 to stop reading.
+    spi_write_read_blocking(spi1, &regnum, &value, 1); // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
+    spi_read_blocking(spi1, 0xFF, &value, 1);          // Read the value back. Send 0 to stop reading.
     gpio_put(_chipSelectPin, 1);                       // Release slave again
     return value;
 } // End PCD_ReadRegister()
@@ -99,7 +99,7 @@ void MFRC522::PCD_ReadRegister(PCD_Register reg, ///< The register to read from.
     uint8_t value = values[0];                              // Index in values array.
     gpio_put(_chipSelectPin, 0);                            // Select slave
     count--;                                                // One read is performed outside of the loop
-    spi_write_read_blocking(spi0, &address, values, count); // Tell MFRC522 which address we want to read
+    spi_write_read_blocking(spi1, &address, values, count); // Tell MFRC522 which address we want to read
     if (rxAlign)
     { // Only update bit positions rxAlign..7 in values[0]
       // Create bit mask for bit positions rxAlign..7

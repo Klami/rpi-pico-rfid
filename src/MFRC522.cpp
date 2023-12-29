@@ -130,6 +130,7 @@ MFRC522::StatusCode MFRC522::PCD_CalculateCRC(uint8_t *data,  ///< In: Pointer t
  */
 void MFRC522::PCD_Init()
 {
+
 	bool hardReset = false;
 
 	// Set the chipSelectPin as digital output, do not select the slave yet
@@ -153,7 +154,6 @@ void MFRC522::PCD_Init()
 			hardReset = true;
 		}
 	}
-
 	if (!hardReset)
 	{ // Perform a soft reset if we haven't triggered a hard reset above.
 		PCD_Reset();
@@ -175,7 +175,8 @@ void MFRC522::PCD_Init()
 
 	PCD_WriteRegister(TxASKReg, 0x40); // Default 0x00. Force a 100 % ASK modulation independent of the ModGsPReg register setting
 	PCD_WriteRegister(ModeReg, 0x3D);  // Default 0x3F. Set the preset value for the CRC coprocessor for the CalcCRC command to 0x6363 (ISO 14443-3 part 6.2.4)
-	PCD_AntennaOn();				   // Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
+	PCD_AntennaOn();
+	// Enable the antenna driver pins TX1 and TX2 (they were disabled by the reset)
 } // End PCD_Init()
 
 /**
